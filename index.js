@@ -1,34 +1,21 @@
-const MongoClient = require('mongodb').MongoClient;
+// Setup MongoDB connection
+const MongoClient = require('mongodb').MongoClient
 
-// Connection URL
-const user = encodeURIComponent('root');
-const password = encodeURIComponent('example');
-const authMechanism = 'DEFAULT';
+const user = encodeURIComponent('root')
+const password = encodeURIComponent('example')
+const authMechanism = 'DEFAULT'
 
-const url = `mongodb://${user}:${password}@localhost:27017/?authMechanism=${authMechanism}`;
+const url = `mongodb://${user}:${password}@localhost:27017/?authMechanism=${authMechanism}`
 
-// const url = 'mongodb://localhost:27017';
 const dbName = "testjobs"
 
-const kafka = require('kafka-node'),
-    Consumer = kafka.Consumer,
-    client = new kafka.KafkaClient({kafkaHost: 'localhost:9092'}),
-    consumer = new Consumer(client,
-        [{ topic: 'jobs', offset: 0}],
-        {
-            autoCommit: false
-        }
-    );
-
-consumer.on('message', (message) => {
-  console.log(message);
-  MongoClient.connect(url)
+const insertDocument = (collection, document) => {
+    MongoClient.connect(url)
     .then((client) => {
       const db = client.db(dbName)
-      console.log("Connected and retrieved db")
-      db.collection('jobs').insertOne(JSON.parse(message.value))
+      db.collection(collection).insertOne(JSON.parse(document))
         .then(result => {
-          console.log(result)
+          console.log("Inserted document")
           client.close()
         })
         .catch(err => {
@@ -40,12 +27,41 @@ consumer.on('message', (message) => {
       console.log("Connection Failed")
       console.log(err)
     }) 
+}
+
+// Setup Kafka connection
+const kafka = require('kafka-node')
+const client = new kafka.KafkaClient({kafkaHost: 'localhost:9092'})
+const jobsConsumer = new kafka.Consumer(client,
+        [{ topic: 'jobs', offset: 0}], { autoCommit: false })
+
+jobsConsumer.on('message', (message) => {
+    console.log(message);
+    insertDocument("jobs", message.value)
 });
 
-consumer.on('error', (err) => {
-    console.log('Error:',err);
+jobsConsumer.on('error', (err) => {
+    console.log('Error:', err);
 })
 
-consumer.on('offsetOutOfRange', (err) => {
-    console.log('offsetOutOfRange:',err);
+jobsConsumer.on('offsetOutOfRange', (err) => {
+    console.log('offsetOutOfRange:', err);
+})
+
+const client2 = new kafka.KafkaClient({kafkaHost: 'localhost:9092'})
+
+const companiesConsumer = new kafka.Consumer(client2,
+    [{ topic: 'companies', offset: 0}], { autoCommit: false })
+
+companiesConsumer.on('message', (message) => {
+    console.log(message);
+    insertDocument("companies", message.value)
+});
+
+companiesConsumer.on('error', (err) => {
+    console.log('Error:', err);
+})
+
+companiesConsumer.on('offsetOutOfRange', (err) => {
+    console.log('offsetOutOfRange:', err);
 })
