@@ -9,13 +9,14 @@ const url = `mongodb://${user}:${password}@localhost:27017/?authMechanism=${auth
 
 const dbName = "testjobs"
 
-const insertDocument = (collection, document) => {
+const insertDocument = (collection, message) => {
     MongoClient.connect(url)
     .then((client) => {
       const db = client.db(dbName)
-      db.collection(collection).insertOne(JSON.parse(document))
-        .then(result => {
-          console.log("Inserted document")
+      const document = JSON.parse(message) 
+      db.collection(collection).update({ urn: document.urn }, document, { upsert: true } )
+        .then(() => {
+          console.log("Upserted document")
           client.close()
         })
         .catch(err => {
@@ -49,7 +50,6 @@ jobsConsumer.on('offsetOutOfRange', (err) => {
 })
 
 const client2 = new kafka.KafkaClient({kafkaHost: 'localhost:9092'})
-
 const companiesConsumer = new kafka.Consumer(client2,
     [{ topic: 'companies', offset: 0}], { autoCommit: false })
 
